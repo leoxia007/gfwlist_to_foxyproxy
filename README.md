@@ -1,0 +1,1 @@
+用于将gfwlist转换成foxyproxy可用的patterns
