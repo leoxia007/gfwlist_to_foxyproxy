@@ -49,8 +49,8 @@ def convert_rule_to_pattern(rule):
     if not domain_part or '.' not in domain_part:
         return None, None
 
-    # FoxyProxy wildcard format: *.domain.com/*
-    pattern = f"*.{domain_part}/*"
+    # FoxyProxy wildcard format: *domain.com*
+    pattern = f"*{domain_part}*"
     # Use the extracted domain as the title
     title = domain_part
 
