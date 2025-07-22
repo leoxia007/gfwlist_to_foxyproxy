@@ -77,6 +77,12 @@ def transform_json_file(input_filepath, output_filepath):
                         "title": "1.1.1.*",
                         "pattern": "^(http|ws)s?://1\\.1\\.1(\\.\\d+){1}/",
                         "active": True
+                    },
+                    {
+                        "type": "wildcard",
+                        "title": "msftconnecttest.com",
+                        "pattern": "*msftconnecttest.com*",
+                        "active": True
                     }
                 ],
                 "tabProxy": []
@@ -101,9 +107,13 @@ def transform_json_file(input_filepath, output_filepath):
     except IOError:
         print(f"错误：无法写入输出文件 '{output_filepath}'。")
 
-# 定义文件路径
-input_file = 'foxyproxy_patterns.json'
-output_file = 'FoxyProxy.json'
+def main():
+    # 定义文件路径
+    input_file = 'foxyproxy_patterns.json'
+    output_file = 'FoxyProxy.json'
 
-# 调用函数执行转换
-transform_json_file(input_file, output_file)
+    # 调用函数执行转换
+    transform_json_file(input_file, output_file)
+    
+if __name__ == "__main__":
+    main()
