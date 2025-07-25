@@ -83,6 +83,12 @@ def transform_json_file(input_filepath, output_filepath):
                         "title": "msftconnecttest.com",
                         "pattern": "*msftconnecttest.com*",
                         "active": True
+                    },
+                    {
+                        "type": "wildcard",
+                        "title": "belling.com.cn",
+                        "pattern": "*belling.com.cn*",
+                        "active": True
                     }
                 ],
                 "tabProxy": []
