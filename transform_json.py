@@ -89,6 +89,12 @@ def transform_json_file(input_filepath, output_filepath):
                         "title": "belling.com.cn",
                         "pattern": "*belling.com.cn*",
                         "active": True
+                    },
+                    {
+                        "type": "wildcard",
+                        "title": "tuchong.com",
+                        "pattern": "*tuchong.com*",
+                        "active": True
                     }
                 ],
                 "tabProxy": []
