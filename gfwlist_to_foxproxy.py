@@ -55,7 +55,6 @@ def convert_rule_to_pattern(rule):
     title = domain_part
 
     return pattern, title
-
 def generate_foxyproxy_patterns(gfwlist_content):
     """
     Process the gfwlist content and generate FoxyProxy patterns in the requested format.
@@ -110,6 +109,11 @@ def main():
     if not foxyproxy_patterns:
         print("No valid patterns generated.")
         return
+
+    # Move patterns with title 'x.com' to the end
+    x_com_patterns = [p for p in foxyproxy_patterns if p['title'] == 'x.com']
+    other_patterns = [p for p in foxyproxy_patterns if p['title'] != 'x.com']
+    foxyproxy_patterns = other_patterns + x_com_patterns
 
     print(f"Successfully generated {len(foxyproxy_patterns)} FoxyProxy patterns.")
 
