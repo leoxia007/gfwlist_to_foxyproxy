@@ -5,6 +5,7 @@ import re
 import os
 import datetime
 import argparse
+from typing import List, Dict, Optional, Tuple, Any
 
 # --- 配置 ---
 GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
@@ -12,7 +13,7 @@ DEFAULT_OUTPUT_FILENAME = "FoxyProxy.json"
 NEW_URLS_FILENAME = "new_list.txt"
 # ---------------------
 
-def fetch_and_decode_gfwlist(url):
+def fetch_and_decode_gfwlist(url: str) -> Optional[str]:
     """
     从指定的 URL 获取 gfwlist 并进行 Base64 解码。
     """
@@ -29,7 +30,7 @@ def fetch_and_decode_gfwlist(url):
         print(f"解码 Base64 内容时出错: {e}")
         return None
 
-def convert_rule_to_pattern(rule):
+def convert_rule_to_pattern(rule: str) -> Tuple[Optional[str], Optional[str]]:
     """
     将 gfwlist 规则转换为 FoxyProxy 通配符模式，并提取域名作为标题。
     """
@@ -44,7 +45,7 @@ def convert_rule_to_pattern(rule):
     title = domain_part
     return pattern, title
 
-def generate_gfw_patterns(gfwlist_content):
+def generate_gfw_patterns(gfwlist_content: str) -> List[Dict[str, Any]]:
     """
     处理 gfwlist 内容并生成 FoxyProxy 模式。
     """
@@ -72,7 +73,7 @@ def generate_gfw_patterns(gfwlist_content):
             processed_patterns.add(pattern)
     return patterns
 
-def create_base_config():
+def create_base_config() -> Dict[str, Any]:
     """
     创建 FoxyProxy 配置的基本结构。
     """
@@ -120,7 +121,7 @@ def create_base_config():
         ]
     }
 
-def add_custom_rules_from_file(config, urls_filepath):
+def add_custom_rules_from_file(config: Dict[str, Any], urls_filepath: str) -> None:
     """
     从文件向配置中添加自定义 URL 规则。
     """
@@ -130,29 +131,38 @@ def add_custom_rules_from_file(config, urls_filepath):
         print(f"成功从 '{urls_filepath}' 读取 {len(urls)} 个 URL。")
     except FileNotFoundError:
         print(f"信息: 自定义规则文件 '{urls_filepath}' 未找到。正在跳过。")
-        return config
+        return
 
-    existing_patterns = {item['pattern'] for item in config['data'][0]['include']}
-    added_count = 0
+    include_list = config['data'][0]['include']
+    existing_patterns = {item['pattern'] for item in include_list}
+    
+    added_rules_count = 0
+    skipped_rules_count = 0
+    invalid_rules_count = 0
 
     for url in urls:
         pattern, title = convert_rule_to_pattern(url)
 
-        if pattern and title and pattern not in existing_patterns:
-            new_rule = {"type": "wildcard", "title": title, "pattern": pattern, "active": True}
-            config['data'][0]['include'].append(new_rule)
-            existing_patterns.add(pattern)
-            added_count += 1
-            print(f"已添加新的自定义规则: '{title}'")
-        elif pattern in existing_patterns:
-            print(f"跳过已存在的自定义规则: '{title}'")
+        if pattern and title:
+            if pattern not in existing_patterns:
+                new_rule = {"type": "wildcard", "title": title, "pattern": pattern, "active": True}
+                include_list.append(new_rule)
+                existing_patterns.add(pattern)
+                added_rules_count += 1
+            else:
+                skipped_rules_count += 1
         else:
-            print(f"无法处理无效的自定义规则: '{url}'")
+            invalid_rules_count += 1
+    
+    if added_rules_count > 0:
+        print(f"已添加 {added_rules_count} 条新的自定义规则。")
+    if skipped_rules_count > 0:
+        print(f"跳过 {skipped_rules_count} 条已存在的自定义规则。")
+    if invalid_rules_count > 0:
+        print(f"跳过 {invalid_rules_count} 条无效的自定义规则。")
 
-    print(f"已添加 {added_count} 条新的自定义规则。")
-    return config
 
-def save_config_to_file(config, filename):
+def save_config_to_file(config: Dict[str, Any], filename: str) -> None:
     """
     将最终配置保存到 JSON 文件。
     """
@@ -187,25 +197,20 @@ def main():
     perform_full_update = not (args.update_gfw or args.add_custom)
 
     config = create_base_config()
-    gfw_patterns = []
 
     if args.update_gfw or perform_full_update:
         gfwlist_content = fetch_and_decode_gfwlist(GFWLIST_URL)
         if gfwlist_content:
             gfw_patterns = generate_gfw_patterns(gfwlist_content)
             
-            # 分离 x.com 模式
-            x_com_patterns = [p for p in gfw_patterns if p.get('title') == 'x.com']
-            other_patterns = [p for p in gfw_patterns if p.get('title') != 'x.com']
-            
-            # 首先添加其他模式，然后添加 x.com 模式
-            config['data'][0]['include'].extend(other_patterns)
-            config['data'][0]['include'].extend(x_com_patterns)
+            # 将 x.com 模式移到末尾
+            gfw_patterns.sort(key=lambda p: p.get('title') == 'x.com')
+            config['data'][0]['include'].extend(gfw_patterns)
             
             print(f"已从 gfwlist 生成并排序 {len(gfw_patterns)} 个模式。")
 
     if args.add_custom or perform_full_update:
-        config = add_custom_rules_from_file(config, NEW_URLS_FILENAME)
+        add_custom_rules_from_file(config, NEW_URLS_FILENAME)
 
     # 确定输出文件名
     output_filename = args.output
