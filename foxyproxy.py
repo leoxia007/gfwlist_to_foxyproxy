@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import requests
 import base64
 import json
@@ -5,7 +6,7 @@ import re
 import os
 import datetime
 import argparse
-from typing import List, Dict, Optional, Tuple, Any
+from typing import Optional, List, Dict, Tuple, Any
 
 # --- 配置 ---
 GFWLIST_URL = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt"
@@ -19,10 +20,11 @@ def fetch_and_decode_gfwlist(url: str) -> Optional[str]:
     """
     print(f"正在从以下地址获取 gfwlist: {url}")
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        decoded_content = base64.b64decode(response.text).decode('utf-8')
-        return decoded_content
+        with requests.Session() as session:
+            response = session.get(url)
+            response.raise_for_status()
+            decoded_content = base64.b64decode(response.text).decode('utf-8')
+            return decoded_content
     except requests.RequestException as e:
         print(f"获取 gfwlist 时出错: {e}")
         return None
@@ -34,9 +36,9 @@ def convert_rule_to_pattern(rule: str) -> Tuple[Optional[str], Optional[str]]:
     """
     将 gfwlist 规则转换为 FoxyProxy 通配符模式，并提取域名作为标题。
     """
-    processed_rule = re.sub(r'^(?:\|\||\.)', '', rule)
+    processed_rule = re.sub(r'^(?:\|\|?|\.)', '', rule)
     processed_rule = processed_rule.replace('^', '')
-    domain_part = re.split(r'[/?\*]', processed_rule)[0]
+    domain_part = re.split(r'[/?*]', processed_rule)[0]
 
     if not domain_part or '.' not in domain_part:
         return None, None
@@ -49,7 +51,7 @@ def generate_gfw_patterns(gfwlist_content: str) -> List[Dict[str, Any]]:
     """
     处理 gfwlist 内容并生成 FoxyProxy 模式。
     """
-    patterns = []
+    patterns: List[Dict[str, Any]] = []
     if not gfwlist_content:
         return patterns
 
@@ -107,11 +109,11 @@ def create_base_config() -> Dict[str, Any]:
                 "proxyDNS": True,
                 "include": [],
                 "exclude": [
-                    {"type": "regex", "title": "10.*.*.*", "pattern": "^(http|ws)s?://10(\\.\\d+){3}/", "active": True},
-                    {"type": "regex", "title": "127.*.*.*", "pattern": "^(http|ws)s?://127(\\.\\d+){3}/", "active": True},
-                    {"type": "regex", "title": "172.16.*.*", "pattern": "^(http|ws)s?://172\\.16(\\.\\d+){2}/", "active": True},
-                    {"type": "regex", "title": "192.168.*.*", "pattern": "^(http|ws)s?://192\\.168(\\.\\d+){2}/", "active": True},
-                    {"type": "regex", "title": "1.1.1.*", "pattern": "^(http|ws)s?://1\\.1\\.1(\\.\\d+){1}/", "active": True},
+                    {"type": "regex", "title": "10.*.*.*", "pattern": r"^(http|ws)s?://10(\.\d+){3}/", "active": True},
+                    {"type": "regex", "title": "127.*.*.*", "pattern": r"^(http|ws)s?://127(\.\d+){3}/", "active": True},
+                    {"type": "regex", "title": "172.16.*.*", "pattern": r"^(http|ws)s?://172\.16(\.\d+){2}/", "active": True},
+                    {"type": "regex", "title": "192.168.*.*", "pattern": r"^(http|ws)s?://192\.168(\.\d+){2}/", "active": True},
+                    {"type": "regex", "title": "1.1.1.*", "pattern": r"^(http|ws)s?://1\.1\.1(\.\d+){1}/", "active": True},
                     {"type": "wildcard", "title": "msftconnecttest.com", "pattern": "*msftconnecttest.com*", "active": True},
                     {"type": "wildcard", "title": "belling.com.cn", "pattern": "*belling.com.cn*", "active": True},
                     {"type": "wildcard", "title": "tuchong.com", "pattern": "*tuchong.com*", "active": True},
@@ -129,7 +131,7 @@ def add_custom_rules_from_file(config: Dict[str, Any], urls_filepath: str) -> No
         with open(urls_filepath, 'r', encoding='utf-8') as f:
             urls = [line.strip() for line in f if line.strip()]
         print(f"成功从 '{urls_filepath}' 读取 {len(urls)} 个 URL。")
-    except FileNotFoundError:
+    except IOError:
         print(f"信息: 自定义规则文件 '{urls_filepath}' 未找到。正在跳过。")
         return
 
@@ -151,6 +153,7 @@ def add_custom_rules_from_file(config: Dict[str, Any], urls_filepath: str) -> No
                 added_rules_count += 1
             else:
                 skipped_rules_count += 1
+                print(f"跳过已存在的自定义规则: {url}")
         else:
             invalid_rules_count += 1
     
@@ -173,7 +176,7 @@ def save_config_to_file(config: Dict[str, Any], filename: str) -> None:
     except IOError as e:
         print(f"保存文件时出错: {e}")
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="FoxyProxy 规则管理器")
     parser.add_argument(
         '--update-gfw',
