@@ -108,6 +108,12 @@ def parse_gfwlist(content, custom_include_file=None):
     include_patterns = []
     exclude_patterns = DEFAULT_EXCLUDES.copy() # 使用硬编码的默认直连规则
     
+    # 用于记录已存在模式的集合，实现去重
+    seen_include = set()
+    seen_exclude = set((item['type'], item['pattern']) for item in exclude_patterns)
+    
+    dup_count = 0  # 记录过滤掉的重复规则数量
+
     # 1. 解析 gfwlist 规则
     lines = content.splitlines()
     for line in lines:
@@ -117,31 +123,51 @@ def parse_gfwlist(content, custom_include_file=None):
         rule = line[2:] if is_whitelist else line
         
         rule_type, pattern = convert_abp_rule(rule)
+        key = (rule_type, pattern)
         pattern_obj = {"type": rule_type, "title": rule, "pattern": pattern, "active": True}
         
-        if is_whitelist: exclude_patterns.append(pattern_obj)
-        else: include_patterns.append(pattern_obj)
+        if is_whitelist:
+            if key not in seen_exclude:
+                seen_exclude.add(key)
+                exclude_patterns.append(pattern_obj)
+            else:
+                dup_count += 1
+        else:
+            if key not in seen_include:
+                seen_include.add(key)
+                include_patterns.append(pattern_obj)
+            else:
+                dup_count += 1
     
-    # 2. 读取并加入 new_list.txt 里的自定义代理规则 (Include)
+    # 2. 读取并加入 custom_include_file 里的自定义代理规则 (Include)
     if custom_include_file:
         try:
             with open(custom_include_file, 'r', encoding='utf-8') as f:
-                count = 0
+                added_count = 0
+                custom_dup_count = 0
                 for line in f:
                     domain = line.strip()
                     if domain:
                         rule_type, pattern = convert_abp_rule(domain)
-                        include_patterns.append({
-                            "type": rule_type,
-                            "title": f"Custom: {domain}",
-                            "pattern": pattern,
-                            "active": True
-                        })
-                        count += 1
-            print(f"✅ 已从 {custom_include_file} 追加了 {count} 条代理规则。")
+                        key = (rule_type, pattern)
+                        if key not in seen_include:
+                            seen_include.add(key)
+                            include_patterns.append({
+                                "type": rule_type,
+                                "title": f"Custom: {domain}",
+                                "pattern": pattern,
+                                "active": True
+                            })
+                            added_count += 1
+                        else:
+                            custom_dup_count += 1
+            print(f"✅ 已从 {custom_include_file} 新增了 {added_count} 条代理规则（忽略了 {custom_dup_count} 条重复规则）。")
         except FileNotFoundError:
             print(f"ℹ️ 未发现自定义列表文件 {custom_include_file}，将只转换 gfwlist。")
             
+    if dup_count > 0:
+        print(f"ℹ️ gfwlist 中自动去除了 {dup_count} 条重复规则。")
+
     return include_patterns, exclude_patterns
 
 def generate_foxyproxy_json(include_patterns, exclude_patterns, proxy_host, proxy_port, proxy_type, title):
