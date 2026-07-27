@@ -57,13 +57,22 @@ def abp_to_regex(rule):
     rule = rule.strip()
     if rule.startswith('/') and rule.endswith('/'):
         return rule[1:-1]
+    
+    # 优先处理 ABP 的 || 域名锚点语法
+    if rule.startswith('||'):
+        domain = rule[2:].rstrip('^')
+        # 将域名中的 * 替换为正则表达式的 .*
+        # 注意：转义特殊字符（如 .），但保留 * 作为通配符
+        domain_parts = domain.split('*')
+        escaped_parts = [re.escape(part) for part in domain_parts]
+        domain_regex = '.*'.join(escaped_parts)
+        return r'^https?://(?:[^/]+\.)?' + domain_regex + r'(?:[:/].*|$)'
+
+    # 处理普通规则
     regex = re.escape(rule)
     regex = regex.replace(r'\|\|', '||').replace(r'\|', '|').replace(r'\^', '^').replace(r'\*', '*')
     
-    if regex.startswith('||'):
-        domain = regex[2:].split('^')[0]
-        return r'^https?://(?:[^/]+\.)?' + domain + r'(?:[:/].*|$)'
-    elif regex.startswith('|'):
+    if regex.startswith('|'):
         content = regex[1:].rstrip('|')
         return r'^' + content + r'.*'
     elif regex.endswith('|'):
